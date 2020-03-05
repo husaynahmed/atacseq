@@ -922,6 +922,40 @@ process MergedLibMetrics {
     """
 }
 
+// TO DO - Add Shifting and Splitting the Reads
+
+// Import the settings from deeptools and use the ATACsplit options and split to NFR and NBR
+
+process MergedLibShiftSplit {
+    tag "$name"
+    label 'process_medium'
+    publishDir "${params.outdir}/bwa/mergedLibrary/shiftsplit", mode: 'copy',
+         saveAs: { filename ->
+                       if (filename.endsWith(".flagstat")) "samtools_stats/$filename"
+                       else if (filename.endsWith(".idxstats")) "samtools_stats/$filename"
+                       else if (filename.endsWith(".stats")) "samtools_stats/$filename"
+                       else if (filename.endsWith(".sorted.bam")) filename
+                       else if (filename.endsWith(".sorted.bam.bai")) filename
+                       else null
+                 }
+     when:
+     !params.skip_picard_metrics
+
+     input:
+     set val(name), file(bam) from ch_mlib_rm_orphan_bam_metrics
+
+
+     output:
+     file "*_metrics" into ch_mlib_collectmetrics_mqc
+     file "*.pdf" into ch_mlib_collectmetrics_pdf
+#
+
+
+
+
+
+
+}
 /*
  * STEP 5.3 Read depth normalised bigWig
  */
