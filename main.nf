@@ -922,7 +922,7 @@ process MergedLibMetrics {
     """
 }
 
-// TO DO - Add Shifting and Splitting the Reads
+// TODO - Add Shifting and Splitting the Reads
 
 // Import the settings from deeptools and use the ATACsplit options and split to NFR and NBR
 
@@ -936,23 +936,63 @@ process MergedLibShiftSplit {
                        else if (filename.endsWith(".stats")) "samtools_stats/$filename"
                        else if (filename.endsWith(".sorted.bam")) filename
                        else if (filename.endsWith(".sorted.bam.bai")) filename
+                       else if (filename.endsWith(".log")) "shift_split_stats/$filename"
                        else null
                  }
-     when:
-     !params.skip_picard_metrics
-
      input:
-     set val(name), file(bam) from ch_mlib_rm_orphan_bam_metrics
-
+     set val(name), file(bam) from ch_mlib_filter_bam
 
      output:
-     file "*_metrics" into ch_mlib_collectmetrics_mqc
-     file "*.pdf" into ch_mlib_collectmetrics_pdf
-#
+     set val(name), file("*.N*R.sorted.{bam,bam.bai}") into ch_mlib_rm_orphan_bam_metrics,
+                                                     ch_mlib_rm_orphan_bam_bigwig,
+                                                     ch_mlib_rm_orphan_bam_macs,
+                                                     ch_mlib_rm_orphan_bam_plotfingerprint,
+                                                     ch_mlib_rm_orphan_bam_mrep
+     set val(name), file("*.flagstat") into ch_mlib_rm_orphan_flagstat_bigwig,
+                                         ch_mlib_rm_orphan_flagstat_macs,
+                                         ch_mlib_rm_orphan_flagstat_mqc
+     file "*.{idxstats,stats}" into ch_mlib_rm_orphan_stats_mqc
+
+
+     script:
+     prefix = "${name}.mLb.clN"
+     prefix_nfr = "${name}.mLb.sHsP.NFR"
+     prefix_nbr = "${name}.mLb.sHsP.NBR"
+     """
+     alignmentSieve --bam ${prefix}.sorted.bam \\
+                    --outFile ${prefix_nfr}.bam \\
+                    --ATACshift \\
+                    -p $task.cpus \\
+                    --smartLabels \\
+                    --minFragmentLength 0 \\
+                    --maxFragmentLength 120 \\
+                    --filterMetrics ${prefix_nfr}.log
+
+     samtools sort -@ $task.cpus -o ${prefix_nfr}.sorted.bam -T $prefix_nfr ${prefix_nfr}.bam
+     samtools index ${prefix_nfr}.sorted.bam
+     samtools flagstat ${prefix_nfr}.sorted.bam > ${prefix_nfr}.sorted.bam.flagstat
+     samtools idxstats ${prefix_nfr}.sorted.bam > ${prefix_nfr}.sorted.bam.idxstats
+     samtools stats ${prefix_nfr}.sorted.bam > ${prefix_nfr}.sorted.bam.stats
 
 
 
+     alignmentSieve --bam ${prefix}.sorted.bam \\
+                    --outFile ${prefix_nbr}.bam \\
+                    --ATACshift \\
+                    -p $task.cpus \\
+                    --smartLabels \\
+                    --minFragmentLength 0 \\
+                    --maxFragmentLength 120 \\
+                    --filterMetrics ${prefix_nbr}.log
 
+     samtools sort -@ $task.cpus -o ${prefix_nbr}.sorted.bam -T $prefix_nfr ${prefix_nbr}.bam
+     samtools index ${prefix_nbr}.sorted.bam
+     samtools flagstat ${prefix_nbr}.sorted.bam > ${prefix_nbr}.sorted.bam.flagstat
+     samtools idxstats ${prefix_nbr}.sorted.bam > ${prefix_nbr}.sorted.bam.idxstats
+     samtools stats ${prefix_nbr}.sorted.bam > ${prefix_nbr}.sorted.bam.stats
+
+     """
+     #
 
 
 }
